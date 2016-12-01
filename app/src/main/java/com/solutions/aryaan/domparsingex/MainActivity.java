@@ -7,12 +7,15 @@ import android.os.Bundle;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -59,25 +62,31 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public static class TechCrunchTask extends AsyncTask<Void,Void,Void>{
+    public static class TechCrunchTask extends AsyncTask<Void,Void,ArrayList<HashMap<String,String>>>{
 
         @Override
-        protected Void doInBackground(Void... voids) {
+        protected ArrayList<HashMap<String,String>> doInBackground(Void... voids) {
 
             String downloadURL = "http://feeds.feedburner.com/techcrunch/android?format=xml";
+            ArrayList<HashMap<String,String>> results = new ArrayList<>();
             try {
                 URL url = new URL(downloadURL);
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("GET");
                 InputStream inputStream = connection.getInputStream();
-                processXML(inputStream);
+                results = processXML(inputStream);
             } catch (Exception e) {
                 Message.logMessage(""+e);
             }
-            return null;
+            return results;
         }
 
-        public void processXML(InputStream inputStream)throws Exception{
+        @Override
+        protected void onPostExecute(ArrayList<HashMap<String, String>> result) {
+            Message.logMessage(result+" ");
+        }
+
+        public ArrayList<HashMap<String,String>> processXML(InputStream inputStream)throws Exception{
             DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
             DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
             Document xmlDocument = documentBuilder.parse(inputStream);
@@ -86,22 +95,63 @@ public class MainActivity extends AppCompatActivity {
             Message.logMessage(""+rootElement.getTagName());
 
             NodeList itemList = rootElement.getElementsByTagName("item");
-            NodeList childItem = null;
+            NodeList itemChildren = null;
+            NamedNodeMap mediaThumbnailAttribute = null;
             Node currentItem = null;
             Node currentChild = null;
+            Node currentAttribute = null;
+            int count = 0;
+            ArrayList<HashMap<String,String>> results = new ArrayList<>();
+            HashMap<String,String> currentMap = null;
+
             for (int i = 0;i<itemList.getLength();i++){
                 currentItem = itemList.item(i);
                 Message.logMessage(""+currentItem.getNodeName());
+                currentMap = new HashMap<>();
 
-                childItem = currentItem.getChildNodes();
-                for (int j=0;j<childItem.getLength();j++){
-                    currentChild = childItem.item(j);
-                    Message.logMessage(""+currentChild.getNodeName());
+                itemChildren = currentItem.getChildNodes();
+                for (int j=0;j<itemChildren.getLength();j++){
+                    currentChild = itemChildren.item(j);
+                    //Message.logMessage(""+currentChild.getNodeName());
                     if (currentChild.getNodeName().equalsIgnoreCase("title")){
-                        Message.logMessage(currentChild.getTextContent());
+                        //Message.logMessage(currentChild.getTextContent());
+                        currentMap.put("title",currentChild.getTextContent());
+                    }
+                    if(currentChild.getNodeName().equalsIgnoreCase("pubDate")){
+                        //Message.logMessage(currentChild.getTextContent());
+                        currentMap.put("pubDate",currentChild.getTextContent());
+                    }
+                    if(currentChild.getNodeName().equalsIgnoreCase("description")){
+                        //Message.logMessage(currentChild.getTextContent());
+                        currentMap.put("description",currentChild.getTextContent());
+                    }
+                    if (currentChild.getNodeName().equalsIgnoreCase("media:thumbnail")){
+                        /*mediaThumbnailAttribute = currentChild.getAttributes();
+                        for (int k = 0;k<mediaThumbnailAttribute.getLength();k++){
+                            currentAttribute = mediaThumbnailAttribute.item(i);
+                            if (currentAttribute.getNodeName().equalsIgnoreCase("url")){
+                                Message.logMessage(currentAttribute.getTextContent());
+                            }
+
+                        }*/
+                        //Message.logMessage(currentChild.getAttributes().item(0).getTextContent());
+                        count++;
+                        if(count == 2){
+                            //Message.logMessage(currentChild.getAttributes().item(0).getTextContent());
+                            currentMap.put("imageURL",currentChild.getAttributes().item(0).getTextContent());
+                        }
+                        //Message.logMessage(count+" ");
+
                     }
                 }
+                //Message.logMessage(" "+currentMap);
+                if (currentMap != null && !currentMap.isEmpty()){
+                    results.add(currentMap);
+                }
+                count = 0;
+
             }
+            return results;
         }
     }
 }
